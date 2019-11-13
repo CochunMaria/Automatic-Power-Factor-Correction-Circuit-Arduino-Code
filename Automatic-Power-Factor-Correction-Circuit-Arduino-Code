@@ -1,0 +1,210 @@
+// include the library code:
+
+#include <LiquidCrystal.h>
+
+int t = 0,buttonState = 0, L = 0;
+int Tvalu, i = 0, j = 0, n = 0, k = 0;
+float TDiff, formalT=0, PDiff, PF, PF0 = 0, rads = 57.29577951; 
+const int APP = A0, VOLT = A1, buttonPin = A4;
+float CAPP, CReactive, InputV, TotalP, ReactiveP, RealP;
+// initialize the library by associating any needed LCD interface pin
+// with the arduino pin number it is connected to
+const int rs = 7, en = 6, d4 = 5, d5 = 4, d6 = 1, d7 = 0;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+void setup() {
+  Timer1Init();
+  lcd.begin(16, 2);
+  // Print a message to the LCD.
+  lcd.print("2019 APFC PROJ.");
+  lcd.setCursor(7,1);
+  lcd.print("BY");
+  delay(1000);
+  lcd.clear();
+  lcd.print("ANWARA,C. C. and");
+  lcd.setCursor(0,1);
+  lcd.print("EGBUIBA, I. C.");
+  delay(1000);
+  lcd.clear();
+  pinMode(2, INPUT);
+  pinMode(3, INPUT);
+  pinMode(buttonPin, INPUT);
+  pinMode(A3, OUTPUT);
+  pinMode(A2, OUTPUT);
+  attachInterrupt(digitalPinToInterrupt(2), voltage , RISING);
+  attachInterrupt(digitalPinToInterrupt(3), current, RISING);
+ 
+  DDRB = DDRB | B00001111;
+  PORTB = 0;
+}
+
+
+void CurrentValue(){
+  CAPP = analogRead(APP);
+  CAPP = abs((((CAPP / 1023)*5000.0)-2500)/185);
+  InputV = analogRead(VOLT);
+  InputV = (InputV/1023)* 240.0;
+}
+void voltage() {
+  TCNT1 = 0;  // timer1 initialized to zero
+  PRR = 0x00;  // TIMER1 TURNED ON
+}
+void current() {
+  Tvalu = TCNT1;  //current time saved
+  PRR = 0x08;     //time1 off
+  
+}
+void Timer1Init(){
+  TCCR1B = B00000010;  // 1:8 prEscalEr valuE
+  TCCR1A = TCCR1C = 0;
+  TIMSK1 = B00000001;  // intErrupt bit EnablE
+  TIFR1 = B00000000;   // intErrupt flag clEar
+  TCNT1 = 0;    // initial timEr valuE
+  PRR = 0x08;  // timEr1 turnd off
+}
+void loop() {
+  Start:
+  TDiff = (Tvalu /2000000.0);
+  PDiff = 18000.0 * TDiff;
+  PF = cos(PDiff / rads);
+  CurrentValue();
+  TotalP = InputV * CAPP;  // Total Power
+  RealP = TotalP * PF;  //Real or Resistive Power
+  ReactiveP = TotalP - RealP;  // Reactive Power
+    lcd.clear();
+    lcd.print("PowerFactor=");
+    lcd.print(PF); 
+    lcd.setCursor(0,1);
+    lcd.print("IPF=");
+    lcd.print(PF0);
+    if(PDiff > 45){
+      PF0 = 0.7;
+      if(PF < PF0){
+        PF0 = PF; 
+      }
+      lcd.setCursor(9,1);
+      lcd.print("Leading");
+      t = 0;
+    }
+    if(PDiff < 315){
+      PF0 = 0.7;
+      if(PF < PF0){
+        PF0 = PF; 
+      }
+      lcd.setCursor(9,1);
+      lcd.print("Lagging");
+      L = 0;
+    }
+    delay(500);
+    lcd.clear();
+    lcd.print("TotalPow=");
+    lcd.print(TotalP); 
+    lcd.setCursor(0,1);
+    lcd.print("XP=");
+    lcd.print(ReactiveP);
+    lcd.setCursor(8,1);
+    lcd.print("RP=");
+    lcd.print(RealP);
+    delay(500);
+   
+  while(PDiff > 0 && PDiff <= 20){
+      goto Start;
+  }
+  while(PDiff > 15 && PDiff <= 90){
+      i++;
+    if(i == 1){
+      PORTB = B00000001;
+      delay(500);
+      goto Start;
+    }
+    if(i == 2){
+      PORTB = B00000011;
+      delay(500);
+      goto Start;
+    }
+    if(i == 3){
+      PORTB = B00000111;
+      delay(500);
+      goto Start;
+    }
+    if(i == 4){
+      n++;
+    if(n == 2){
+    if(PDiff > 35){
+     while(buttonState != 1){
+      buttonState = digitalRead(buttonPin);
+      if( buttonState == 1){
+        buttonState = 1;
+      }
+      lcd.clear();
+      lcd.setCursor(3,0);
+      lcd.print("LOAD BELOW");
+      lcd.setCursor(3,1);
+      lcd.print("MIN. LIMIT");
+      tone(A3, 3000);
+      digitalWrite(A2, HIGH);   // turn the LED on (HIGH is the voltage level)
+      delay(500);                       // wait for a second
+      digitalWrite(A2, LOW);    // turn the LED off by making the voltage LOW
+      delay(500);
+      }
+      n = 0;
+      noTone(A3);
+      }
+     }
+      
+      PORTB = B00001111;
+      delay(500);
+      i = 0;
+      goto Start;
+  }
+ }
+   while(PDiff < 360 && PDiff >= 340){
+      goto Start;
+   }
+      while(PDiff < 345 && PDiff >= 270){
+        j++;
+        if(j == 1){
+         PORTB = B00001111;
+         delay(500);
+         goto Start;
+        }
+        if(j == 2){
+         PORTB = B00000111;
+         delay(500);
+         goto Start;
+        }
+        if(j == 3){
+          PORTB = B00000011;
+          delay(500);
+          goto Start;
+        }
+      if(j == 4){
+      k++;
+     if(k == 2){ 
+      if(PDiff < 315){
+        while(buttonState != 1){
+         buttonState = digitalRead(buttonPin);
+         if( buttonState == 1){
+           buttonState = 1;
+         }
+         lcd.clear();
+         lcd.setCursor(3,0);
+         lcd.print("LOAD ABOVE");
+         lcd.setCursor(3,1);
+         lcd.print("MAX. LIMIT");
+         tone(A3, 3000);
+         digitalWrite(A2, HIGH);   // turn the LED on (HIGH is the voltage level)
+         delay(500);                       // wait for a second
+         digitalWrite(A2, LOW);    // turn the LED off by making the voltage LOW
+         delay(500);
+        }
+        k = 0;
+        noTone(A3);
+      }
+     }
+      PORTB = B00000001;
+      delay(500);
+      j = 0;
+      goto Start;
+    }
+   }
+  }
